@@ -13,7 +13,7 @@ def load_data(file_path):
     return df
 
 def preprocess_data(df):
-    #Prepare features and target for modeling
+    # Prepare features and target for modeling
     # Drop 'Time' column
     X = df.drop(['Class', 'Time'], axis=1, errors='ignore')
     y = df['Class'].astype(int)
@@ -46,7 +46,26 @@ def calculate_risks(X, y):
     # Predict probabilities on full dataset (for risk distribution)
     proba = model.predict_proba(X)[:, 1]
     risk_perc = np.clip(proba, 0.0001, 0.9999) * 100
-    return risk_perc
+
+    # Predict fraud status (0/1) for full dataset
+    y_pred_full = model.predict(X)
+    return risk_perc, y_pred_full
+
+def show_fraud_money_stats(df, y_pred):
+    # Use predictions to flag frauds
+    fraud_mask = y_pred == 1
+    print("\nUsing predicted frauds for value calculations:")
+    # Calculate total value of fraud transactions
+    fraud_transactions = df[fraud_mask]
+    fraud_total_value = fraud_transactions['Amount'].sum()
+    portfolio_total_value = df['Amount'].sum()
+    fraud_percent = (fraud_total_value / portfolio_total_value) * 100
+
+    print("="*60)
+    print(f"Potential fraudulent activities (predicted): ${fraud_total_value:,.0f}")
+    print(f"Portfolio risk exposure:                   ${portfolio_total_value:,.0f}")
+    print(f"Fraud risk represents                      {fraud_percent:.2f}% of the total portfolio.")
+    print("="*60)
 
 def create_visualization(df):
     # Create risk distribution plot
@@ -68,10 +87,11 @@ def main():
     print("Starting Credit Card Fraud Risk Analysis\n" + "="*40)
     df = load_data('/Users/johnny/Desktop/Projects/Credit Risk Project/creditcard.csv')
     X, y = preprocess_data(df)
-    risk_perc = calculate_risks(X, y)
+    risk_perc, y_pred_full = calculate_risks(X, y)
     df['Default_Risk_Perc'] = risk_perc
     df[['Default_Risk_Perc']].to_csv('/Users/johnny/Desktop/Projects/Credit Risk Project/creditcard_risk_percentages.csv', index=False)
     print("Risk percentages saved to: creditcard_risk_percentages.csv")
+    show_fraud_money_stats(df, y_pred_full)
     create_visualization(df)
     print(f"\nFound {len(df)} transactions")
     print(f"Average predicted risk: {df['Default_Risk_Perc'].mean():.2f}%")
